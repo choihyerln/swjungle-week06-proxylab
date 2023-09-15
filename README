@@ -21,7 +21,21 @@ csapp.c
 
 Makefile
     This is the makefile that builds the proxy program.  Type "make"
-    to build your solution, or "make clean" followed by "make" for a
+    to build your solution, or "make clean" proxy.c: 이 파일은 프록시 서버의 소스 코드를 포함하고 있습니다. 이 파일을 수정하여 프록시 서버를 구현해야 합니다.
+
+csapp.h 및 csapp.c: 이 파일들은 교재에 설명되어 있는 "Computer Systems: A Programmer's Perspective"에 소개된 CSAPP 라이브러리 파일입니다. 이 파일들은 소켓 및 다른 시스템 호출을 간소화하기 위한 도우미 함수 및 정의를 제공합니다.
+
+Makefile: 프록시 프로그램을 빌드하기 위한 Makefile입니다. "make"를 실행하여 솔루션을 빌드하거나 "make clean" 다음 "make"를 실행하여 깨끗한 빌드를 할 수 있습니다. "make handin"을 입력하여 제출할 tar 파일을 생성할 수도 있습니다.
+
+port-for-user.pl: 특정 사용자에 대한 무작위 포트를 생성하는 Perl 스크립트입니다. 사용 방법은 ./port-for-user.pl <userID>와 같습니다.
+
+free-port.sh: 사용 가능한 미사용 TCP 포트를 식별하는 스크립트입니다. 사용 방법은 ./free-port.sh와 같습니다.
+
+driver.sh: 기본, 동시성 및 캐시 오토그레이더 스크립트입니다. 사용 방법은 ./driver.sh와 같습니다.
+
+nop-server.py: 오토그레이더를 위한 도우미 스크립트입니다.
+
+tiny: CS:APP 교재에 포함된 Tiny 웹 서버입니다.followed by "make" for a
     fresh build. 
 
     Type "make handin" to create the tarfile that you will be handing
