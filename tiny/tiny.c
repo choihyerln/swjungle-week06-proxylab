@@ -17,33 +17,36 @@ void serve_dynamic(int fd, char *filename, char *cgiargs);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
                  char *longmsg);
 
-/* serve_dynamic - 동적 콘텐츠를 제공하는 함수 */
-void serve_dynamic(int fd, char *filename, char *cgiargs)
-{
+/* 
+ * serve_dynamic - 동적 콘텐츠를 제공하기 위해 자식 프로세스를 생성하고
+ * 해당 자식 프로세스 내에서 CGI 프로그램을 실행하는 함수
+ */
+void serve_dynamic(int fd, char *filename, char *cgiargs) {
   char buf[MAXLINE], *emptylist[] = {NULL};
-  /* Return first part of HTTP response */
+
+  /* 응답의 첫 줄과 서버 정보를 클라이언트에게 보냄 */
   sprintf(buf, "HTTP/1.0 200 OK\r\n");
   Rio_writen(fd, buf, strlen(buf));
   sprintf(buf, "Server: Tiny Web Server\r\n");
   Rio_writen(fd, buf, strlen(buf));
 
-  if (Fork() == 0)
-  { /* Child */
+  if (Fork() == 0) { // 자식 프로세스
     /* Real server would set all CGI vars here */
-    setenv("QUERY_STRING", cgiargs, 1);
-    Dup2(fd, STDOUT_FILENO);              /* Redirect stdout to client */
+    setenv("QUERY_STRING", cgiargs, 1); // QUERY_STRING 환경 변수 초기화
+    Dup2(fd, STDOUT_FILENO);  // 자식의 표준 출력을 클라이언트와 연결된 fd로 리다이렉션
     Execve(filename, emptylist, environ); /* Run CGI program */
   }
-  Wait(NULL); /* Parent waits for and reaps child */
+  // 부모 프로세스
+  Wait(NULL); // 자식 프로세스의 종료 대기
 }
 
 /* serve_static - 정적 콘텐츠를 제공하는 함수 */
-void serve_static(int fd, char *filename, int filesize)
-{
+void serve_static(int fd, char *filename, int filesize) {
   int srcfd;
   char *srcp, filetype[MAXLINE], buf[MAXBUF];
 
-  get_filetype(filename, filetype);
+  get_filetype(filename, filetype);   // 파일 확장자에 따라 MIME 타입 결정
+  // sprintf(buf, "HTTP/1.1 200 OK\r\n");
   sprintf(buf, "HTTP/1.0 200 OK\r\n");
   sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
   sprintf(buf, "%sConnection: close\r\n", buf);
@@ -55,15 +58,17 @@ void serve_static(int fd, char *filename, int filesize)
 
   /* Send response body to client */
   srcfd = Open(filename, O_RDONLY, 0);
-  srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
+  // srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
+  srcp = (char*)malloc(filesize);
+  Rio_readn(srcfd, srcp, filesize);
   Close(srcfd);
   Rio_writen(fd, srcp, filesize);
-  Munmap(srcp, filesize);
+  free(srcp);
+  // Munmap(srcp, filesize);
 }
 
 /* get_filetype - 받아야 하는 filetype을 명시하는 함수 */
-void get_filetype(char *filename, char *filetype)
-{
+void get_filetype(char *filename, char *filetype) {
   if (strstr(filename, ".html"))
     strcpy(filetype, "text/html");
   else if (strstr(filename, ".gif"))
@@ -72,57 +77,69 @@ void get_filetype(char *filename, char *filetype)
     strcpy(filetype, "image/png");
   else if (strstr(filename, ".jpg"))
     strcpy(filetype, "image/jpeg");
+  else if (strstr(filename, ".jpg"))
+    strcpy(filetype, "image/jpeg");
+  else if (strstr(filename, ".MP4"))
+    strcpy(filetype, "image/MP4");
   else
     strcpy(filetype, "text/plain");
 }
 
-/* parse_uri - 클라이언트가 요청한 URI를 파싱하는 함수 */
-int parse_uri(char *uri, char *filename, char *cgiargs)
-{
+/* 
+ * parse_uri - 클라이언트가 요청한 URI를 파일 이름과 선택적인 CGI 문자열로 파싱하는 함수
+ * tiny 서버의 모든 동적 컨텐츠를 위한 실행파일은 cgi-bin이라는 디렉토리에 넣는 방식
+ * 따라서 uri에 cgi-bin이라는 경로가 있는지 확인해서 정적 or 동적 보내야하는지 판단
+ */
+int parse_uri(char *uri, char *filename, char *cgiargs) {
   char *ptr;
-
-  if (!strstr(uri, "cgi-bin"))
-  {
-    strcpy(cgiargs, "");
+  
+  // 요청이 정적 콘텐츠라면
+  if (!strstr(uri, "cgi-bin")) {
+    strcpy(cgiargs, "");    // uri에 cgi-bin과 일치하는 문자열이 없다면 cgiargs에는 빈 문자열 저장
+    
+    // 상대 리눅스 경로이름으로 변환 (./index.html과 같은)
     strcpy(filename, ".");
     strcat(filename, uri);
-    if (uri[strlen(uri) - 1] == '/')
-      strcat(filename, "home.html");
+
+    if (uri[strlen(uri) - 1] == '/')  // uri가 '/' 문자로 끝난다면
+      strcat(filename, "home.html");  // 기본 파일 이름 추가
     return 1;
   }
-  else
-  {
-    ptr = index(uri, '?');
-    if (ptr)
-    {
-      strcpy(cgiargs, ptr + 1);
-      *ptr = '\0';
+  // 요청이 동적 콘텐츠라면
+  else {
+    ptr = index(uri, '?');  // ? 뒤에 인자 있음
+    if (ptr) {    
+      strcpy(cgiargs, ptr + 1); // cgi 인자 카피
+      *ptr = '\0';  // 뒤에 인자 떼기 위해 string NULL 표시
     }
-    else
-      strcpy(cgiargs, "");
-    strcpy(filename, ".");
-    strcat(filename, uri);
+    else  // ?가 없다면₩
+      strcpy(cgiargs, "");  // cgiargs에 빈 문자열 저장
+
+    strcpy(filename, ".");  // 경로 시작점 지정
+    strcat(filename, uri);  // uri 붙여줌
     return 0;
   }
 }
 
 /* read_requesthdrs - request header를 읽는 함수 */
-void read_requesthdrs(rio_t *rp)
-{
+void read_requesthdrs(rio_t *rp) {
   char buf[MAXLINE];
 
-  Rio_readlineb(rp, buf, MAXLINE);
-  while (strcmp(buf, "\r\n"))
-  {
-    rio_readlineb(rp, buf, MAXLINE);
-    printf("%s", buf);
+  Rio_readlineb(rp, buf, MAXLINE);  // 요청 라인 읽기
+  // 빈 텍스트 라인 확인하기 위해 캐리지 리턴 + 줄바꿈
+  // strcmp 함수를 사용해서 현재 읽은 줄(buf)이 \r\n과 같지 않을 때까지 계속해서 읽는다. 같으면 0 -> while문 탈출
+  while (strcmp(buf, "\r\n")) {
+    rio_readlineb(rp, buf, MAXLINE);  // 요청 헤더의 나머지 부분 읽는 작업
+    printf("%s", buf);  // 각 헤더 필드를 읽어 들인 후 화면 출력
   }
   return;
 }
 
-/* clienterror - 에러 처리를 위한 함수 */
-void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg)
-{
+/* 
+ * clienterror - Tiny 서버에서 발생한 일부 에러를 처리하고
+ *               이를 클라이언트에 보고하는 함수
+ */
+void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg) {
   char buf[MAXLINE], body[MAXBUF];
 
   sprintf(body, "<html><title>Tiny Error</title>");
@@ -194,7 +211,7 @@ void doit(int fd) {
                   "Tiny couldn't run the CGI program");
       return;
     }
-    serve_dynamic(fd, filename, cgiargs);   // 동적 콘텐츠 제공
+    serve_dynamic(fd, filename, cgiargs);   // 동적 콘텐츠 클라이언트에게 제공
   }
 }
 
