@@ -11,9 +11,9 @@
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
 int parse_uri(char *uri, char *filename, char *cgiargs);
-void serve_static(int fd, char *filename, int filesize);
+void serve_static(int fd, char *filename, int filesize, char *method);
 void get_filetype(char *filename, char *filetype);
-void serve_dynamic(int fd, char *filename, char *cgiargs);
+void serve_dynamic(int fd, char *filename, char *cgiargs, char *method);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
                  char *longmsg);
 
@@ -21,7 +21,7 @@ void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
  * serve_dynamic - 동적 콘텐츠를 제공하기 위해 자식 프로세스를 생성하고
  * 해당 자식 프로세스 내에서 CGI 프로그램을 실행하는 함수
  */
-void serve_dynamic(int fd, char *filename, char *cgiargs) {
+void serve_dynamic(int fd, char *filename, char *cgiargs, char *method) {
   char buf[MAXLINE], *emptylist[] = {NULL};
 
   /* 응답의 첫 줄과 서버 정보를 클라이언트에게 보냄 */
@@ -29,6 +29,9 @@ void serve_dynamic(int fd, char *filename, char *cgiargs) {
   Rio_writen(fd, buf, strlen(buf));
   sprintf(buf, "Server: Tiny Web Server\r\n");
   Rio_writen(fd, buf, strlen(buf));
+
+  if (!strcasecmp(method, "HEAD"))  // 과제 11.11 - HEAD면 바로 return
+    return;
 
   if (Fork() == 0) { // 자식 프로세스
     /* Real server would set all CGI vars here */
@@ -41,7 +44,7 @@ void serve_dynamic(int fd, char *filename, char *cgiargs) {
 }
 
 /* serve_static - 정적 콘텐츠를 제공하는 함수 */
-void serve_static(int fd, char *filename, int filesize) {
+void serve_static(int fd, char *filename, int filesize, char *method) {
   int srcfd;
   char *srcp, filetype[MAXLINE], buf[MAXBUF];
 
@@ -55,6 +58,9 @@ void serve_static(int fd, char *filename, int filesize) {
   Rio_writen(fd, buf, strlen(buf));
   printf("Response headers:\n");
   printf("%s", buf);
+
+  if (!strcasecmp(method, "HEAD"))    // 과제 11.11 - head면 바로 return
+    return;
 
   /* Send response body to client */
   srcfd = Open(filename, O_RDONLY, 0);
@@ -179,7 +185,9 @@ void doit(int fd) {
   sscanf(buf, "%s %s %s", method, uri, version);  // 문자열 파싱 -> GET /godzilla.gif HTTP/1.1
 
   // Tiny는 GET 메서드만 지원
-  if (strcasecmp(method, "GET")) {
+  // if (strcasecmp(method, "GET"))
+  if (strcasecmp(method, "GET") && strcasecmp(method, "HEAD"))  // 과제 11.11
+  {
     // 0이면 같다는 의미 -> if문 안: get이 아닐 때
     clienterror(fd, method, "501", "Not implemented",
                 "Tiny does not implement this method");
@@ -202,7 +210,7 @@ void doit(int fd) {
                   "Tiny couldn't read this file");
       return;
     }
-    serve_static(fd, filename, sbuf.st_size); // 정적 콘텐츠 클라이언트에게 제공
+    serve_static(fd, filename, sbuf.st_size, method); // 정적 콘텐츠 클라이언트에게 제공
   }
 
   else {    // 동적 콘텐츠이면
@@ -211,7 +219,7 @@ void doit(int fd) {
                   "Tiny couldn't run the CGI program");
       return;
     }
-    serve_dynamic(fd, filename, cgiargs);   // 동적 콘텐츠 클라이언트에게 제공
+    serve_dynamic(fd, filename, cgiargs, method);   // 동적 콘텐츠 클라이언트에게 제공
   }
 }
 
