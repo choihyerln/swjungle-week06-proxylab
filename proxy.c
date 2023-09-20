@@ -110,6 +110,12 @@ void doit(int p_connfd) {
   Close(p_clientfd);
 }
 
+// 이 부분 생략해도 코드 돌아가긴 하는데.. 있으면 좀비 자식들 청소해주니까 있으면 장시간 돌아가는 서버에게 좋음
+void sigchld_handler(int sig) {
+  while (waitpid(-1, 0, WNOHANG) > 0);
+  return;
+}
+
 int main(int argc, char **argv) {
   int listenfd, p_connfd;
   char hostname[MAXLINE], port[MAXLINE];
@@ -119,20 +125,25 @@ int main(int argc, char **argv) {
   if (argc != 2) {
     fprintf(stderr, "usage: %s <port>\n", argv[0]);
     exit(1);
-  }
+  } 
 
+  Signal(SIGCHLD, sigchld_handler);
   listenfd = Open_listenfd(argv[1]);  // 해당 포트번호에 맞는 대기 소켓fd open
-
   // 클라이언트 요청이 들어올 때마다 새로 연결할 소켓 만들어 doit() 호출
   while(1) {
     clientlen = sizeof(clientaddr);
     // 클라에게서 받은 연결 요청을 accept, p_connfd = proxy의 connfd
     p_connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);
     // 연결 성공 메세지를 위해 Getnameinfo 호출하면서 hostname과 port가 채워짐
+    // doit(p_connfd);
     Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
     printf("프록시 연결 성공! (%s %s)\n", hostname, port);
-    doit(p_connfd);
-
+    if (Fork() == 0) {
+      Close(listenfd);
+      doit(p_connfd);
+      Close(p_connfd);
+      exit(0);
+    }
     Close(p_connfd);
   }
   return 0;
