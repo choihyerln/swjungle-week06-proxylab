@@ -55,7 +55,7 @@ void response(int p_connfd, int p_clientfd) {
    파싱 후 (server로 보낼 request line)
    => GET /index.html HTTP/11. 
  */
-int parse_uri(char *uri, char *hostname, char *port, char *uri_ptos) {
+int parse_uri(char *uri, char *hostname, char *port, char *uri_ptos) {    
   char *ptr;
 
   if (!(ptr = strstr(uri, "://")))  // ptr = uri에서 첫번째로 나온 "://"의 시작 인덱스 포인터
@@ -78,16 +78,13 @@ int parse_uri(char *uri, char *hostname, char *port, char *uri_ptos) {
 
   // port = 80/index.html
   // port 번호에 / 있으면 그 부분 추출
+  strcpy(uri_ptos, "/");  // uri_ptos '/'로 시작
   if ((ptr = strchr(port, '/'))) {  // "/" 있으면 ptr 설정
     *ptr = '\0';    // '/'부분 NULL처리
     ptr += 1;       // 그 다음으로 ptr 이동 (i)
-    // proxy->server로 보낼 uri에 담기 
-    strcpy(uri_ptos, "/");    // '/' 부터
+    // proxy->server로 보낼 uri에 담기
     strcat(uri_ptos, ptr);    // uri_ptos = /index.html
   }
-  else  // port에 '/'가 없으면
-    strcpy(uri_ptos, "/");  // '/'
-
   return 0;
 }
 
