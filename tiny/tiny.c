@@ -50,6 +50,7 @@ void serve_static(int fd, char *filename, int filesize, char *method) {
 
   get_filetype(filename, filetype);   // 파일 확장자에 따라 MIME 타입 결정
   // sprintf(buf, "HTTP/1.1 200 OK\r\n");
+  printf("------tiny------");
   sprintf(buf, "HTTP/1.0 200 OK\r\n");
   sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
   sprintf(buf, "%sConnection: close\r\n", buf);
@@ -118,7 +119,7 @@ int parse_uri(char *uri, char *filename, char *cgiargs) {
       strcpy(cgiargs, ptr + 1); // cgi 인자 카피
       *ptr = '\0';  // 뒤에 인자 떼기 위해 string NULL 표시
     }
-    else  // ?가 없다면₩
+    else  // ?가 없다면
       strcpy(cgiargs, "");  // cgiargs에 빈 문자열 저장
 
     strcpy(filename, ".");  // 경로 시작점 지정
